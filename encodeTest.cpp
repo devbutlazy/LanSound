@@ -1,9 +1,65 @@
+#include <array>
+#include <atomic>
 #include <iostream>
-#include <vector>
+#include <string>
 #include <opus/opus.h>
+#include <vector>
 
 const int SAMPLE_RATE = 48000;
 const int FRAME_SIZE = 960; // ~20ms in 48kHz
+
+template <typename T, size_t N>
+class CircularQueue
+{
+private:
+    std::array<T, N> buffer_;
+    std::atomic<size_t> head_;
+    std::atomic<size_t> tail_;
+
+public:
+    static_assert((N & (N - 1)) == 0, "N must be a power of 2");
+
+    CircularQueue() : head_(0), tail_(0) {}
+
+    bool push(const T &item)
+    {
+        size_t head = head_.load(std::memory_order_relaxed);
+        size_t next_head = (head + 1) & (N - 1);
+
+        if (next_head == tail_.load(std::memory_order_acquire))
+        {
+            return false; // full
+        }
+
+        buffer_[head] = item;
+        head_.store(next_head, std::memory_order_release);
+        return true;
+    }
+
+    std::optional<T> pop()
+    {
+        size_t tail = tail_.load(std::memory_order_relaxed);
+
+        if (tail == head_.load(std::memory_order_acquire))
+        {
+            return std::nullopt; 
+        }
+
+        T item = buffer_[tail];
+        tail_.store((tail + 1) & (N - 1), std::memory_order_release);
+        return item;
+    }
+
+    bool empty() const
+    {
+        return head_.load(std::memory_order_acquire) == tail_.load(std::memory_order_acquire);
+    }
+
+    bool full() const
+    {
+        return ((head_.load(std::memory_order_acquire) + 1) & (N - 1)) == tail_.load(std::memory_order_acquire);
+    }
+};
 
 int main()
 {
