@@ -1,30 +1,47 @@
 #include <array>
 #include <atomic>
 #include <iostream>
-#include <string>
+#include <memory>
+#include <optional>
 #include <opus/opus.h>
+#include <span>
+#include <string>
 #include <vector>
 
 const int SAMPLE_RATE = 48000;
 const int FRAME_SIZE = 960; // ~20ms in 48kHz
 
-template <typename T, size_t N>
+template <typename T>
 class CircularQueue
 {
 private:
-    std::array<T, N> buffer_;
+    std::unique_ptr<T[]> raw_buffer_;
+    std::span<T> buffer_;
+    size_t size_;
     std::atomic<size_t> head_;
     std::atomic<size_t> tail_;
 
-public:
-    static_assert((N & (N - 1)) == 0, "N must be a power of 2");
+    static bool is_power_of_two(size_t n)
+    {
+        return (n & (n - 1)) == 0;
+    }
 
-    CircularQueue() : head_(0), tail_(0) {}
+public:
+    explicit CircularQueue(size_t n)
+        : raw_buffer_(nullptr), buffer_(), size_(n), head_(0), tail_(0)
+    {
+        if (!is_power_of_two(n))
+        {
+            throw std::invalid_argument("Size must be a power of 2");
+        }
+        raw_buffer_ = std::make_unique<T[]>(n);
+        buffer_ = std::span<T>(raw_buffer_.get(), n);
+    }
 
     bool push(const T &item)
     {
         size_t head = head_.load(std::memory_order_relaxed);
-        size_t next_head = (head + 1) & (N - 1);
+        size_t next_head = (head + 1) & (size_ - 1);
 
         if (next_head == tail_.load(std::memory_order_acquire))
         {
@@ -42,11 +59,11 @@ public:
 
         if (tail == head_.load(std::memory_order_acquire))
         {
-            return std::nullopt; 
+            return std::nullopt; // empty
         }
 
         T item = buffer_[tail];
-        tail_.store((tail + 1) & (N - 1), std::memory_order_release);
+        tail_.store((tail + 1) & (size_ - 1), std::memory_order_release);
         return item;
     }
 
@@ -57,7 +74,12 @@ public:
 
     bool full() const
     {
-        return ((head_.load(std::memory_order_acquire) + 1) & (N - 1)) == tail_.load(std::memory_order_acquire);
+        return ((head_.load(std::memory_order_acquire) + 1) & (size_ - 1)) == tail_.load(std::memory_order_acquire);
+    }
+
+    size_t capacity() const
+    {
+        return size_;
     }
 };
 
@@ -90,7 +112,8 @@ int main()
 
     const size_t pcm_bytes = FRAME_SIZE * channels * 2;
 
-    std::vector<std::vector<unsigned char>> opus_packets;
+    // std::vector<std::vector<unsigned char>> opus_packets;
+    CircularQueue<std::vector<unsigned char>> opus_queue(1024);
     std::vector<unsigned char> input_pcm(pcm_bytes);
     std::vector<opus_int16> pcm(FRAME_SIZE * channels);
     std::vector<unsigned char> opus_data(4000); // Opus packet <= 4000 bytes
@@ -109,11 +132,24 @@ int main()
             break;
         }
 
-        opus_packets.emplace_back(opus_data.begin(), opus_data.begin() + encoded_bytes);
+        // opus_packets.emplace_back(opus_data.begin(), opus_data.begin() + encoded_bytes);
+        std::vector<unsigned char> packet(opus_data.begin(), opus_data.begin() + encoded_bytes);
+        if (!opus_queue.push(packet))
+        {
+            std::cerr << "Queue is full, dropping packet!" << std::endl;
+        }
     }
 
     opus_encoder_destroy(encoder);
 
-    std::cout << "Encoded " << opus_packets.size() << " packets.\n";
+    std::cout << "Dequeuing and printing sizes of encoded packets:" << std::endl;
+    while (!opus_queue.empty())
+    {
+        auto pkt = opus_queue.pop();
+        if (pkt)
+        {
+            std::cout << "Packet size: " << pkt->size() << " bytes" << std::endl;
+        }
+    }
     return 0;
 }
