@@ -6,9 +6,5 @@
 /.idea
 /cmake-build*
 
-# xmake, build
+# cmake build
 /build
-/.xmake
-/makefile
-/CMakeLists.txt
-/compile_commands.json
