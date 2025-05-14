@@ -2,8 +2,7 @@ add_rules("mode.debug", "mode.release")
 
 set_policy("build.optimization.lto", true)
 
-add_requires("boost ^1.82.0", {configs = {filesystem = true, system = true}})
-add_requires("opus ^1.5.0", {configs = {shared = true}})
+add_requires("libopus ^1.5.0", {configs = {shared = true}})
 
 
 target("lansound")
@@ -11,7 +10,7 @@ target("lansound")
     set_toolchains("clang") -- required until xmake >2.9.9
     set_languages("c++26")
     set_policy("build.c++.modules", true)   -- allow module features in all files (not only .cppm)
-    add_packages("opus")
+    add_packages("libopus")
     add_files("src/*.cpp", "src/*.cppm")
 
 --
