@@ -8,6 +8,7 @@ add_requires("opus ^1.5.0", {configs = {shared = true}})
 
 target("lansound")
     set_kind("binary")
+    set_toolchains("clang") -- required until xmake >2.9.9
     set_languages("c++26")
     set_policy("build.c++.modules", true)   -- allow module features in all files (not only .cppm)
     add_packages("opus")
