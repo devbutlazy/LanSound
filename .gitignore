@@ -1,3 +1,14 @@
-*.exe
-/build
+# vscode-specific
 /.vscode
+/.cache
+
+# CLion-specific
+/.idea
+/cmake-build*
+
+# xmake, build
+/build
+/.xmake
+/makefile
+/CMakeLists.txt
+/compile_commands.json
