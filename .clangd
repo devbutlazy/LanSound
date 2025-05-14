@@ -1,0 +1,2 @@
+CompileFlags:
+  Add: [-xc++, -Wall, -Wextra, -std=c++26] # enable more warnings
