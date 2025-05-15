@@ -21,7 +21,7 @@ CPMAddPackage(
         NAME Boost
         VERSION 1.88.0
         URL https://github.com/boostorg/boost/releases/download/boost-1.88.0/boost-1.88.0-cmake.tar.xz
-        URL_HASH SHA256=fd60da30be908eff945735ac7d4d9addc7f7725b1ff6fcdcaede5262d511d21e
+        URL_HASH SHA256=f48b48390380cfb94a629872346e3a81370dc498896f16019ade727ab72eb1ec
         OPTIONS "BOOST_ENABLE_CMAKE ON" "BOOST_SKIP_INSTALL_RULES ON" # fixme: set `OFF` for installation
         "BUILD_SHARED_LIBS OFF" "BOOST_INCLUDE_LIBRARIES filesystem\\\;system\\\;asio"
 )
