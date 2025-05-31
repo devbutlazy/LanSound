@@ -3,6 +3,7 @@ module;
 #include <cstddef>
 #include <cstdint>
 #include <expected>
+#include <functional>
 #include <memory>
 #include <string_view>
 
@@ -13,31 +14,49 @@ using std::size_t, std::uint8_t, std::uint16_t, std::string_view, std::byte,
 
 using std::string_view_literals::operator""sv;
 
+template <typename O, typename T, typename U>
+  requires std::convertible_to<T, bool> && std::convertible_to<T, O> &&
+           std::convertible_to<U, O>
+constexpr O some_or(T &&val, U &&otherwise) {
+  if (static_cast<bool>(val)) {
+    return static_cast<O>(val);
+  }
+  return static_cast<O>(otherwise);
+}
+
 struct Empty {};
 export template <typename T = Empty>
-  requires std::is_destructible_v<T> && std::is_move_constructible_v<T>
+  requires std::destructible<T> && std::move_constructible<T>
 struct EncoderError {
-  const int error;
   const string_view message;
+  const int error;
+  static constexpr int CUSTOM_ERROR = -1;
   // is zero-sized most of the time
   [[no_unique_address]]
   T owned_data;
 
   explicit EncoderError(const int err)
-      : error(err),
-        message(opus_strerror(err) == nullptr ? "Unknown error"sv
-                                              : opus_strerror(err)) {}
+      : message(some_or<string_view>(opus_strerror(err), "Unknown error"sv)),
+        error(err) {}
 
   explicit constexpr EncoderError(const string_view msg)
-      : error(0), message(msg) {}
+      : message(msg), error(CUSTOM_ERROR) {}
 
   EncoderError(const string_view msg, T &&data)
-      : error(0), message(msg), owned_data(std::move(data)) {}
+      : message(msg), error(CUSTOM_ERROR), owned_data(std::move(data)) {}
 
   // might be incorrect :)
   template <std::enable_if<std::is_copy_constructible_v<T>>>
   EncoderError(const EncoderError &) = delete;
 };
+
+std::expected<int, EncoderError<>> check_error(int code) {
+  if (code != OPUS_OK) {
+    return std::unexpected(EncoderError(code));
+  }
+
+  return code;
+}
 
 export enum class EncoderChannels : uint8_t {
   Mono = 1,
@@ -71,31 +90,37 @@ public:
 
   Encoder(Encoder &&) = default;
 
-  static auto make(const EncoderChannels channels)
-      -> std::expected<Encoder, EncoderError<>> {
+  static std::expected<Encoder, EncoderError<>>
+  make(const EncoderChannels channels) {
     Encoder ins = Encoder(static_cast<uint8_t>(channels));
 
-#define CHECK_ERROR(var)                                                       \
-  if (var != OPUS_OK) {                                                        \
-    return std::unexpected(EncoderError<>(var));                               \
-  }
+    auto res =
+        check_error(opus_encoder_init(ins.opus_encoder_state_, SAMPLE_RATE,
+                                      ins.channels, OPUS_APPLICATION_AUDIO))
+            .and_then([&ins](int) {
+              // only limited by output buffer size
+              return check_error(opus_encoder_ctl(
+                  ins.opus_encoder_state_, OPUS_SET_BITRATE(OPUS_BITRATE_MAX)));
+            })
+            .and_then([&ins](int) {
+              return check_error(opus_encoder_ctl(ins.opus_encoder_state_,
+                                                  OPUS_SET_COMPLEXITY(10)));
+            })
+            .and_then([&ins](int) {
+              return check_error(opus_encoder_ctl(
+                  ins.opus_encoder_state_, OPUS_SET_PACKET_LOSS_PERC(25)));
+            })
+            .and_then([&ins](int) {
+              return check_error(
+                  opus_encoder_ctl(ins.opus_encoder_state_, OPUS_SET_DTX(1)));
+            });
 
-    int ret = opus_encoder_init(ins.opus_encoder_state_, SAMPLE_RATE,
-                                ins.channels, OPUS_APPLICATION_AUDIO);
-    CHECK_ERROR(ret);
-
-    // only limited by output buffer size
-    ret = opus_encoder_ctl(ins.opus_encoder_state_,
-                           OPUS_SET_BITRATE(OPUS_BITRATE_MAX));
-    CHECK_ERROR(ret);
-    ret = opus_encoder_ctl(ins.opus_encoder_state_, OPUS_SET_COMPLEXITY(10));
-    CHECK_ERROR(ret);
-    ret = opus_encoder_ctl(ins.opus_encoder_state_,
-                           OPUS_SET_PACKET_LOSS_PERC(25));
-    CHECK_ERROR(ret);
-    ret = opus_encoder_ctl(ins.opus_encoder_state_, OPUS_SET_DTX(1));
-    CHECK_ERROR(ret);
+    if (!res.has_value())
+      return std::unexpected(res.error());
 
     return std::move(ins);
   }
+
+  // todo: encode
+  // todo: encode that pushes into a queue and launches sender
 };
