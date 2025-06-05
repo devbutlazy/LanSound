@@ -9,7 +9,7 @@ set(CMAKE_CXX_SCAN_FOR_MODULES ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # LTO on
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 
 include(cmake/CPM.cmake)
 
@@ -44,10 +44,17 @@ target_sources(
         src/main.cpp
 )
 
+target_sources(LanSound
+    PRIVATE
+    FILE_SET my_modules TYPE CXX_MODULES FILES
+    src/packet.cppm
+)
+
 target_sources(
         LanSound
         PRIVATE
         FILE_SET my_modules TYPE CXX_MODULES FILES
         src/encoder.cppm
         src/queue.cppm
+        src/send_packet.cppm
 )

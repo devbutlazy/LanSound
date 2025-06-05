@@ -16,7 +16,7 @@ private:
   size_t size_;
   std::atomic<size_t> head_;
   std::atomic<size_t> tail_;
-
+  
   static bool is_power_of_two(size_t n) { return (n & (n - 1)) == 0; }
 
 public:
