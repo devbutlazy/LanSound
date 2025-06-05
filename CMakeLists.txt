@@ -45,17 +45,12 @@ target_sources(
         src/main.cpp
 )
 
-target_sources(LanSound
-    PRIVATE
-    FILE_SET my_modules TYPE CXX_MODULES FILES
-    src/packet.cppm
-)
-
 target_sources(
         LanSound
         PRIVATE
         FILE_SET my_modules TYPE CXX_MODULES FILES
         src/encoder.cppm
         src/queue.cppm
+        src/packet.cppm
         src/send_packet.cppm
 )
