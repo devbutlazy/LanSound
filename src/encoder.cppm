@@ -121,11 +121,4 @@ public:
 
     return std::move(ins);
   }
-<<<<<<< HEAD
 };
-=======
-
-  // todo: encode
-  // todo: encode that pushes into a queue and launches sender
-};
->>>>>>> 2a9dfa6835e1385d318c965a82b4effc44cbe2bd
